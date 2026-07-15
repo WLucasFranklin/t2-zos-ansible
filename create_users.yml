@@ -1,0 +1,38 @@
+---
+- name: Create RACF users
+  hosts: zoslab
+  gather_facts: false
+
+  environment: "{{ environment_vars }}"
+
+  collections:
+    - ibm.ibm_zos_core
+
+  vars_files:
+    - vars/users.yml
+
+  tasks:
+    - name: Generate RACF user creation JCL
+      ansible.builtin.template:
+        src: templates/create_users.jcl.j2
+        dest: /tmp/create_users.jcl
+        mode: "0600"
+      delegate_to: localhost
+      no_log: false
+
+    - name: Submit generated JCL
+      zos_job_submit:
+        src: /tmp/create_users.jcl
+        location: LOCAL
+        wait: true
+        wait_time_s: 60
+        return_output: true
+      register: job_result
+      no_log: false
+
+    - name: Display submitted job information
+      ansible.builtin.debug:
+        msg:
+          - "Job ID: {{ job_result.jobs[0].job_id }}"
+          - "Job name: {{ job_result.jobs[0].job_name }}"
+          - "Return code: {{ job_result.jobs[0].ret_code.msg }}"
