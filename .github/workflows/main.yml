@@ -1,4 +1,4 @@
-name: Update Deployment
+name: TruffleHog
 
 on:
   pull_request:
