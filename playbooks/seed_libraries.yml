@@ -28,7 +28,7 @@
 
     - name: Find seed files
       ansible.builtin.find:
-        paths: "{{ playbook_dir }}/playbooks/seed_files"
+        paths: "{{ playbook_dir }}/seed_files"
         file_type: file
         hidden: yes
         recurse: yes
