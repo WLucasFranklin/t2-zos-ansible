@@ -42,12 +42,3 @@
         remote_src: false
         replace: true
       loop: "{{ seed_files.files }}"
-
-    - name: Show file mappings
-      debug:
-        msg: >-
-          {{ item.path }}
-          ->
-          TEAM02.SEED.{{ item.path.split('/')[-2] }}
-          ({{ item.path.split('/')[-1].split('.')[0] }})
-      loop: "{{ seed_files.files }}"
