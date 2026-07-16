@@ -21,6 +21,7 @@ ADDUSER ({{ user.userid }}) -
 //*
 //* DELETE, RECREATE, AND SEED EACH USER LIBRARY
 //*
+{#
 {% for user in racf_users %}
 //DL{{ "%05d"|format(loop.index) }} EXEC PGM=IEFBR14
 //OLDLIB   DD DSN={{ user.userid }}.DEV.SRCLIB,
@@ -39,3 +40,4 @@ ADDUSER ({{ user.userid }}) -
  COPY INDD=INDD,OUTDD=OUTDD
 /*
 {% endfor %}
+#}
