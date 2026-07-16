@@ -10,6 +10,7 @@
 
   vars_files:
     - vars/users.yml
+    - vars/datasets.yml
 
   tasks:
     - name: Generate RACF user creation JCL
@@ -30,9 +31,42 @@
       register: job_result
       no_log: false
 
-    - name: Display submitted job information
-      ansible.builtin.debug:
-        msg:
-          - "Job ID: {{ job_result.jobs[0].job_id }}"
-          - "Job name: {{ job_result.jobs[0].job_name }}"
-          - "Return code: {{ job_result.jobs[0].ret_code.msg }}"
+    - name: Create seed libraries
+      zos_data_set:
+        name: "{{ item.dataset }}"
+        state: present
+        type: pdse
+        record_format: fb
+        record_length: 80
+        block_size: 3120
+        space_primary: 5
+        space_secondary: 2
+        space_type: trk
+      loop: "{{ seed_libraries }}"
+
+    - name: Find seed files
+      ansible.builtin.find:
+        paths: "{{ playbook_dir }}/playbooks/seed_files"
+        file_type: file
+      delegate_to: localhost
+      register: seed_files
+
+    - name: Show number of seed files found
+      debug:
+        msg: "Found {{ seed_files.files | length }} seed files"
+
+    - name: Copy seed files into datasets
+      zos_copy:
+        src: "{{ item.path }}"
+        dest: "TEAM02.SEED.{{ item.path.split('/')[-2] }}({{ item.path.split('/')[-1].split('.')[0] }})"
+        remote_src: false
+      loop: "{{ seed_files.files }}"
+
+    - name: Show file mappings
+      debug:
+        msg: >-
+          {{ item.path }}
+          ->
+          TEAM02.SEED.{{ item.path.split('/')[-2] }}
+          ({{ item.path.split('/')[-1].split('.')[0] }})
+      loop: "{{ seed_files.files }}"
