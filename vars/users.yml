@@ -1,22 +1,24 @@
 ---
+team_group: TEAM02
+
 racf_users:
   - userid: USER04
     name: "Test User 4"
-    default_group: TEAM02
+    default_group: "{{ team_group }}"
     password: TEMP123
     account: ACCT001
     procedure: DB13PROC
 
   - userid: USER05
     name: "Test User 5"
-    default_group: TEAM02
+    default_group: "{{ team_group }}"
     password: TEMP123
     account: ACCT001
     procedure: DB13PROC
 
   - userid: USER06
     name: "Test User 6"
-    default_group: TEAM02
+    default_group: "{{ team_group }}"
     password: TEMP123
     account: ACCT001
     procedure: DB13PROC

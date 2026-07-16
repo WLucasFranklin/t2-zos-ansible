@@ -1,31 +1,126 @@
 ---
-- name: Create RACF users
+- name: Create Team 2 RACF users
   hosts: zoslab
   gather_facts: false
 
   environment: "{{ environment_vars }}"
 
-  collections:
-    - ibm.ibm_zos_core
-
   vars_files:
     - vars/users.yml
 
   tasks:
-    - name: Generate RACF user creation JCL
-      ansible.builtin.template:
-        src: templates/create_users.jcl.j2
-        dest: /tmp/create_users.jcl
-        mode: "0600"
-      delegate_to: localhost
-      no_log: false
+    - name: Validate RACF user variables
+      ansible.builtin.assert:
+        that:
+          - team_group is defined
+          - racf_users is defined
+          - racf_users | length > 0
+        fail_msg: "Team group or RACF user variables are missing."
 
-    - name: Submit generated JCL
-      zos_job_submit:
-        src: /tmp/create_users.jcl
-        location: LOCAL
-        wait: true
-        wait_time_s: 60
-        return_output: true
-      register: job_result
-      no_log: false
+    - name: Check whether the TEAM02 group exists
+      ibm.ibm_zos_core.zos_tso_command:
+        commands:
+          - "LISTGRP {{ team_group }}"
+        max_rc: 8
+      register: group_check
+      failed_when: false
+      changed_when: false
+
+    - name: Create TEAM02 when missing
+      ibm.ibm_zos_core.zos_tso_command:
+        commands:
+          - "ADDGROUP {{ team_group }} OWNER(IBMUSER)"
+        max_rc: 0
+      when:
+        - group_check.output | length > 0
+        - group_check.output[0].rc | int != 0
+
+    - name: Check whether each RACF user exists
+      ibm.ibm_zos_core.zos_tso_command:
+        commands:
+          - "LISTUSER {{ item.userid }}"
+        max_rc: 8
+      loop: "{{ racf_users }}"
+      loop_control:
+        label: "{{ item.userid }}"
+      register: user_checks
+      retries: 3
+      delay: 2
+      until:
+        - user_checks.rc is not defined or user_checks.rc | int != 129
+      failed_when: false
+      changed_when: false
+
+    - name: Display RACF user check results
+      ansible.builtin.debug:
+        msg:
+          userid: "{{ item.item.userid }}"
+          module_rc: "{{ item.rc | default('not returned') }}"
+          command_rc: >-
+            {{
+              item.output[0].rc
+              if item.output is defined and item.output | length > 0
+              else 'not returned'
+            }}
+          stderr: "{{ item.stderr | default('') }}"
+      loop: "{{ user_checks.results }}"
+      loop_control:
+        label: "{{ item.item.userid }}"
+
+    - name: Create missing RACF users
+      ibm.ibm_zos_core.zos_tso_command:
+        commands:
+          - >-
+            ADDUSER {{ item.item.userid }}
+            NAME('{{ item.item.name }}')
+            OWNER({{ team_group }})
+            DFLTGRP({{ item.item.default_group }})
+            PASSWORD({{ item.item.password }})
+            TSO(
+              ACCTNUM({{ item.item.account }})
+              PROC({{ item.item.procedure }})
+            )
+        max_rc: 0
+      loop: "{{ user_checks.results }}"
+      loop_control:
+        label: "{{ item.item.userid }}"
+      when:
+        - item.rc | default(0) | int != 129
+        - item.output is defined
+        - item.output | length > 0
+        - item.output[0].rc | int != 0
+      no_log: true
+
+    - name: Ensure users are connected to TEAM02
+      ibm.ibm_zos_core.zos_tso_command:
+        commands:
+          - >-
+            CONNECT {{ item.userid }}
+            GROUP({{ team_group }})
+            AUTHORITY(USE)
+        max_rc: 8
+      loop: "{{ racf_users }}"
+      loop_control:
+        label: "{{ item.userid }}"
+      changed_when: false
+
+    - name: Ensure TEAM02 is the default group
+      ibm.ibm_zos_core.zos_tso_command:
+        commands:
+          - >-
+            ALTUSER {{ item.userid }}
+            DFLTGRP({{ team_group }})
+        max_rc: 0
+      loop: "{{ racf_users }}"
+      loop_control:
+        label: "{{ item.userid }}"
+
+    - name: Verify each RACF user
+      ibm.ibm_zos_core.zos_tso_command:
+        commands:
+          - "LISTUSER {{ item.userid }}"
+        max_rc: 0
+      loop: "{{ racf_users }}"
+      loop_control:
+        label: "{{ item.userid }}"
+      changed_when: false
