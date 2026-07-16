@@ -50,3 +50,34 @@
         dest: "{{ playbook_dir }}/../vars/datasets.yml"
         mode: "0644"
       delegate_to: localhost
+
+    - name: Load updated datasets.yml
+      ansible.builtin.include_vars:
+        file: "{{ playbook_dir }}/../vars/datasets.yml"
+    
+    - name: Build desired and existing dataset lists
+      ansible.builtin.set_fact:
+        desired_datasets: >-
+          {{
+            seed_libraries
+            | map(attribute='dataset')
+            | list
+          }}
+        existing_datasets: >-
+          {{
+            dataset_results.data_sets
+            | map(attribute='name')
+            | list
+          }}
+
+    - name: Find datasets missing from z/OS
+      ansible.builtin.set_fact:
+        missing_datasets: >-
+          {{
+            desired_datasets
+            | difference(existing_datasets)
+          }}
+
+    - name: Show missing datasets
+      ansible.builtin.debug:
+        var: missing_datasets
