@@ -1,0 +1,36 @@
+---
+- name: Find TEAM02 datasets
+  hosts: zoslab
+  gather_facts: false
+
+  environment: "{{ environment_vars }}"
+
+  collections:
+    - ibm.ibm_zos_core
+
+  tasks:
+    - name: Find TEAM02 seed datasets
+      ibm.ibm_zos_core.zos_find:
+        patterns:
+          - "TEAM02.SEED.*"
+      register: dataset_results
+
+    - name: Show matching datasets
+      ansible.builtin.debug:
+        var: dataset_results.data_sets
+
+    - name: Find members in TEAM02 seed libraries
+      ibm.ibm_zos_core.zos_find:
+        pds_patterns:
+          - "TEAM02.SEED.ASM"
+          - "TEAM02.SEED.COBOL"
+          - "TEAM02.SEED.JCL"
+          - "TEAM02.SEED.PROCLIB"
+          - "TEAM02.SEED.REXX"
+        patterns:
+          - ".*"
+      register: member_results
+
+    - name: Show complete member results
+      ansible.builtin.debug:
+        var: member_results
