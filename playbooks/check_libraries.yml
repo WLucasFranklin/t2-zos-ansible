@@ -1,5 +1,5 @@
 ---
-- name: Find TEAM02 datasets
+- name: Check TEAM02 datasets
   hosts: zoslab
   gather_facts: false
 
@@ -9,6 +9,7 @@
     - ibm.ibm_zos_core
 
   tasks:
+# Query z/OS for existing datasets/members: TEAM02.SEED.*
     - name: Find TEAM02 seed datasets
       ibm.ibm_zos_core.zos_find:
         patterns:
@@ -21,12 +22,12 @@
 
     - name: Find members in TEAM02 seed libraries
       ibm.ibm_zos_core.zos_find:
-        pds_patterns:
-          - "TEAM02.SEED.ASM"
-          - "TEAM02.SEED.COBOL"
-          - "TEAM02.SEED.JCL"
-          - "TEAM02.SEED.PROCLIB"
-          - "TEAM02.SEED.REXX"
+        pds_patterns: >-
+          {{
+            dataset_results.data_sets
+            | map(attribute='name')
+            | list
+          }}
         patterns:
           - ".*"
       register: member_results
@@ -34,3 +35,18 @@
     - name: Show complete member results
       ansible.builtin.debug:
         var: member_results
+# Check playbooks/seed_files for updated list of required files: Update vars/datasets.yml
+    - name: Find seed library folders
+      ansible.builtin.find:
+        paths: "{{ playbook_dir }}/seed_files"
+        file_type: directory
+        recurse: false
+      delegate_to: localhost
+      register: seed_library_folders
+
+    - name: Generate datasets.yml from seed folders
+      ansible.builtin.template:
+        src: "{{ playbook_dir }}/../templates/datasets.yml.j2"
+        dest: "{{ playbook_dir }}/../vars/datasets.yml"
+        mode: "0644"
+      delegate_to: localhost

@@ -1,4 +1,3 @@
----
 seed_libraries:
   - dataset: TEAM02.SEED.ASM
     source: ASM
@@ -14,4 +13,3 @@ seed_libraries:
 
   - dataset: TEAM02.SEED.REXX
     source: REXX
-
