@@ -16,4 +16,3 @@ environment_vars:
   LANG: "C"
   PYTHONSTDINENCODING: "cp1047"
   PYTHONIOENCODING: "utf-8"
-  
