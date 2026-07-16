@@ -20,4 +20,3 @@ racf_users:
     password: TEMP123
     account: ACCT001
     procedure: DB13PROC
-    
