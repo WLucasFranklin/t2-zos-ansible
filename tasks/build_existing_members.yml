@@ -1,0 +1,12 @@
+---
+- name: Add members from {{ current_dataset.name }}
+  ansible.builtin.set_fact:
+    existing_members: >-
+      {{
+        existing_members
+        +
+        [
+          current_dataset.name ~ '(' ~ item ~ ')'
+        ]
+      }}
+  loop: "{{ current_dataset.members.keys() | list }}"

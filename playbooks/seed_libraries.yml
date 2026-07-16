@@ -24,7 +24,15 @@
         space_primary: 5
         space_secondary: 2
         space_type: trk
-      loop: "{{ seed_libraries }}"
+      loop: >-
+        {{
+          seed_libraries
+          | selectattr('dataset', 'in', missing_datasets)
+          | list
+        }}
+      loop_control:
+        label: "{{ item.dataset }}"
+      when: missing_datasets | length > 0
 
     - name: Find seed files
       ansible.builtin.find:

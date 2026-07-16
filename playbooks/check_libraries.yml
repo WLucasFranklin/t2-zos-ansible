@@ -81,3 +81,61 @@
     - name: Show missing datasets
       ansible.builtin.debug:
         var: missing_datasets
+
+    - name: Find local seed files
+      ansible.builtin.find:
+        paths: "{{ playbook_dir }}/seed_files"
+        file_type: file
+        recurse: true
+        hidden: true
+      delegate_to: localhost
+      register: seed_files
+      
+    - name: Build desired member list
+      ansible.builtin.set_fact:
+        desired_members: >-
+          {{
+            desired_members | default([]) +
+            [
+              'TEAM02.SEED.'
+              ~ (item.path | dirname | basename | upper)
+              ~ '('
+              ~ (
+                  item.path
+                  | basename
+                  | regex_replace('\.[^.]+$', '')
+                  | upper
+                )
+              ~ ')'
+            ]
+          }}
+      loop: "{{ seed_files.files }}"
+
+    - name: Initialize existing member list
+      ansible.builtin.set_fact:
+        existing_members: []
+
+    - name: Build existing member list
+      ansible.builtin.set_fact:
+        existing_members: >-
+          {{
+            existing_members +
+            (
+              item.members.keys()
+              | map('regex_replace', '^(.*)$', item.name ~ '(\\1)')
+              | list
+            )
+          }}
+      loop: "{{ member_results.data_sets }}"
+
+    - name: Find members missing from z/OS
+      ansible.builtin.set_fact:
+        missing_members: >-
+          {{
+            desired_members
+            | difference(existing_members)
+          }}
+
+    - name: Show missing members
+      ansible.builtin.debug:
+        var: missing_members
