@@ -1,4 +1,0 @@
-/* REXX */                                                              
-ADDRESS TSO                                                             
-"LISTDS 'IBMUSER.*.JCL'"                                                
-exit 0                                                                  
