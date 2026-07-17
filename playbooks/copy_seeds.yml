@@ -9,8 +9,8 @@
     - ibm.ibm_zos_core
 
   vars_files:
-    - vars/users.yml
-    - vars/datasets.yml
+    - ../vars/users.yml
+    - ../vars/datasets.yml
 
   tasks:
     - name: Create user libraries

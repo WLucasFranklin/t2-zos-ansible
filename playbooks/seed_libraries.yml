@@ -9,8 +9,8 @@
     - ibm.ibm_zos_core
 
   vars_files:
-    - vars/users.yml
-    - vars/datasets.yml
+    - ../vars/users.yml
+    - ../vars/datasets.yml
 
   tasks:
     - name: Create seed libraries
@@ -48,5 +48,5 @@
         src: "{{ item.path }}"
         dest: "TEAM02.SEED.{{ item.path.split('/')[-2] }}({{ item.path.split('/')[-1].split('.')[0] }})"
         remote_src: false
-        replace: true
+        force: true
       loop: "{{ seed_files.files }}"
