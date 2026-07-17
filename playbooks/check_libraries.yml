@@ -119,14 +119,15 @@
       ansible.builtin.set_fact:
         existing_members: >-
           {{
-            existing_members +
-            (
-              item.members.keys()
-              | map('regex_replace', '^(.*)$', item.name ~ '(\\1)')
-              | list
-            )
+            existing_members
+            +
+            [
+              item.0.name ~ '(' ~ item.1 ~ ')'
+            ]
           }}
-      loop: "{{ member_results.data_sets }}"
+      loop: "{{ query('subelements', member_results.data_sets, 'members') }}"
+      loop_control:
+        label: "{{ item.0.name }}({{ item.1 }})"
 
     - name: Find members missing from z/OS
       ansible.builtin.set_fact:
