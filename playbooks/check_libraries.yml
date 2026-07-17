@@ -140,3 +140,13 @@
     - name: Show missing members
       ansible.builtin.debug:
         var: missing_members
+
+    - name: Run seed tasks for missing resources
+      ansible.builtin.include_tasks:
+        file: "{{ playbook_dir }}/../tasks/seed_libraries.yml"
+      vars:
+        libraries_to_create: "{{ missing_datasets }}"
+        members_to_copy: "{{ missing_members }}"
+      when:
+        - missing_datasets | length > 0
+          or missing_members | length > 0
