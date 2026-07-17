@@ -29,6 +29,7 @@
     dest: "{{ destination_member }}"
     remote_src: false
     force: true
+    force_lock: true
     encoding:
       from: UTF-8
       to: IBM-1047
