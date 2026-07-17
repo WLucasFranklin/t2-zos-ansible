@@ -1,0 +1,185 @@
+---
+- name: Provision one AWS instance per Team 2 user
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars_files:
+    - ../vars/users.yml
+    - ../vars/aws.yml
+
+  tasks:
+    - name: Validate AWS provisioning variables
+      ansible.builtin.assert:
+        that:
+          - team_group is defined
+          - racf_users is defined
+          - racf_users | length > 0
+          - aws_region is defined
+          - aws_allowed_ssh_cidr is defined
+          - aws_allowed_ssh_cidr != "0.0.0.0/0"
+        fail_msg: >-
+          Required AWS variables are missing or SSH access is open to the
+          entire internet.
+
+    - name: Verify the EC2 public key exists
+      ansible.builtin.stat:
+        path: "{{ aws_public_key_file }}"
+      register: ec2_public_key
+
+    - name: Stop when the EC2 public key is missing
+      ansible.builtin.assert:
+        that:
+          - ec2_public_key.stat.exists
+          - ec2_public_key.stat.isreg
+        fail_msg: >-
+          Public key was not found at {{ aws_public_key_file }}.
+
+    - name: Read the current Amazon Linux 2023 AMI
+      ansible.builtin.command:
+        argv:
+          - aws
+          - ssm
+          - get-parameter
+          - --region
+          - "{{ aws_region }}"
+          - --name
+          - "{{ aws_ami_parameter }}"
+          - --query
+          - Parameter.Value
+          - --output
+          - text
+      register: amazon_linux_ami
+      changed_when: false
+
+    - name: Store the Amazon Linux AMI ID
+      ansible.builtin.set_fact:
+        aws_ami_id: "{{ amazon_linux_ami.stdout | trim }}"
+
+    - name: Create the Team 2 VPC
+      amazon.aws.ec2_vpc_net:
+        name: "{{ aws_vpc_name }}"
+        cidr_block: "{{ aws_vpc_cidr }}"
+        region: "{{ aws_region }}"
+        dns_support: true
+        dns_hostnames: true
+        tags:
+          Name: "{{ aws_vpc_name }}"
+          Team: "{{ team_group }}"
+          ManagedBy: Ansible
+        state: present
+      register: team_vpc
+
+    - name: Create the Team 2 public subnet
+      amazon.aws.ec2_vpc_subnet:
+        vpc_id: "{{ team_vpc.vpc.id }}"
+        cidr: "{{ aws_subnet_cidr }}"
+        region: "{{ aws_region }}"
+        map_public: true
+        tags:
+          Name: "{{ aws_subnet_name }}"
+          Team: "{{ team_group }}"
+          ManagedBy: Ansible
+        state: present
+      register: team_subnet
+
+    - name: Create the Team 2 internet gateway
+      amazon.aws.ec2_vpc_igw:
+        vpc_id: "{{ team_vpc.vpc.id }}"
+        region: "{{ aws_region }}"
+        tags:
+          Name: "{{ aws_internet_gateway_name }}"
+          Team: "{{ team_group }}"
+          ManagedBy: Ansible
+        state: present
+      register: team_igw
+
+    - name: Create the Team 2 public route table
+      amazon.aws.ec2_vpc_route_table:
+        vpc_id: "{{ team_vpc.vpc.id }}"
+        region: "{{ aws_region }}"
+        tags:
+          Name: "{{ aws_route_table_name }}"
+          Team: "{{ team_group }}"
+          ManagedBy: Ansible
+        subnets:
+          - "{{ team_subnet.subnet.id }}"
+        routes:
+          - dest: 0.0.0.0/0
+            gateway_id: "{{ team_igw.gateway_id }}"
+        state: present
+
+    - name: Create the Team 2 SSH security group
+      amazon.aws.ec2_security_group:
+        name: "{{ aws_security_group_name }}"
+        description: SSH access for Team 2 EC2 instances
+        vpc_id: "{{ team_vpc.vpc.id }}"
+        region: "{{ aws_region }}"
+        rules:
+          - proto: tcp
+            ports:
+              - 22
+            cidr_ip: "{{ aws_allowed_ssh_cidr }}"
+            rule_desc: SSH from the Ansible controller
+        rules_egress:
+          - proto: -1
+            cidr_ip: 0.0.0.0/0
+        tags:
+          Name: "{{ aws_security_group_name }}"
+          Team: "{{ team_group }}"
+          ManagedBy: Ansible
+        state: present
+      register: team_security_group
+
+    - name: Import the Team 2 EC2 public key
+      amazon.aws.ec2_key:
+        name: "{{ aws_key_name }}"
+        key_material: "{{ lookup('file', aws_public_key_file) }}"
+        region: "{{ aws_region }}"
+        state: present
+
+    - name: Create one EC2 instance per RACF user
+      amazon.aws.ec2_instance:
+        name: "{{ team_group }}-{{ item.userid }}"
+        region: "{{ aws_region }}"
+        image_id: "{{ aws_ami_id }}"
+        instance_type: "{{ aws_instance_type }}"
+        key_name: "{{ aws_key_name }}"
+        vpc_subnet_id: "{{ team_subnet.subnet.id }}"
+        security_group: "{{ team_security_group.group_id }}"
+        network:
+          assign_public_ip: true
+        exact_count: 1
+        filters:
+          "tag:Name": "{{ team_group }}-{{ item.userid }}"
+          "tag:Team": "{{ team_group }}"
+          instance-state-name:
+            - pending
+            - running
+            - stopping
+            - stopped
+        tags:
+          Name: "{{ team_group }}-{{ item.userid }}"
+          Owner: "{{ item.userid }}"
+          Team: "{{ team_group }}"
+          ManagedBy: Ansible
+        state: running
+        wait: true
+      loop: "{{ racf_users }}"
+      loop_control:
+        label: "{{ item.userid }}"
+      register: team_instances
+
+    - name: Display instance information
+      ansible.builtin.debug:
+        msg:
+          user: "{{ item.item.userid }}"
+          instance_id: "{{ item.instances[0].instance_id }}"
+          public_ip: >-
+            {{
+              item.instances[0].public_ip_address
+              | default('Not assigned')
+            }}
+      loop: "{{ team_instances.results }}"
+      loop_control:
+        label: "{{ item.item.userid }}"
