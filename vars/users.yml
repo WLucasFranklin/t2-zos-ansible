@@ -1,5 +1,6 @@
 ---
 team_group: TEAM02
+team_gid: 8022
 
 racf_users:
   - userid: USER04
@@ -8,6 +9,7 @@ racf_users:
     password: TEMP123
     account: ACCT001
     procedure: DB13PROC
+    uid: 8041
 
   - userid: USER05
     name: "Test User 5"
@@ -15,6 +17,7 @@ racf_users:
     password: TEMP123
     account: ACCT001
     procedure: DB13PROC
+    uid: 8042
 
   - userid: USER06
     name: "Test User 6"
@@ -22,3 +25,4 @@ racf_users:
     password: TEMP123
     account: ACCT001
     procedure: DB13PROC
+    uid: 8043
